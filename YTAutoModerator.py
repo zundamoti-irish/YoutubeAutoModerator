@@ -3,6 +3,8 @@ import time
 import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+import emoji
 
 #使用ツール : pytchat
 #URL : https://github.com/taizan-hokuto/pytchat
@@ -17,7 +19,7 @@ from selenium.webdriver.common.by import By
 def main():
     #以下のIDは配信ごとに変更してください。
     #
-    video_id = "cz9wZFxJ9g4"
+    video_id = "jP-TZNL2zp4"
 
     #モデレーターアクション ボタンの表示テキストで判定しています。
     # (Youtubeの表示が変わった場合は、この文字列を編集すると使えるはず)
@@ -57,15 +59,17 @@ def main():
 
     livechat = pytchat.create(video_id)
     while livechat.is_alive():
-
         # チャットデータの取得
         chatdata = livechat.get()
         for c in chatdata.items:
             #以下の文は自分の好きなようにアルゴリズムを作成してください。
             #例として、コメントが150文字以上を削除しています。
-            if len(c.message)>150:   #コメントが150文字以上
+
+            #絵文字も1文字としてカウントする
+            messageStr = emoji.emojize(c.message)
+            if len(messageStr)>150:   #コメントが150文字以上
                 #情報確認用
-                #print(f"{c.id} {c.author.channelUrl} {c.datetime} {c.author.name} {c.messageEx} {c.amountString}"
+                #print(f"{c.id} {c.author.channelUrl} {c.datetime} {c.author.name} {messageStr} {c.amountString}")
 
                 #対象のコメントに対してidを検索してエレメントを取得する
                 comment_id = '//*[@id=\"' + c.id + '\"]'
@@ -74,10 +78,13 @@ def main():
                 #actionStr = '//*[@id="items"]/ytd-menu-navigation-item-renderer' #『チャンネル』へを押したい場合はこのXPathを取得してください
                 actionStr = '/html/body/yt-live-chat-app/tp-yt-iron-dropdown/div/ytd-menu-popup-renderer/tp-yt-paper-listbox/ytd-menu-service-item-renderer'
                 action_elements =  driver.find_elements(By.XPATH, actionStr)
+                clickFlag = False
                 for action_element in action_elements:
                     #ボタンの中から削除ボタンを選んで押しています。
                     if(action_element.text == delStr):
                         action_element.click()
+                        #クリックした場合はフラグをTrueに設定してください。
+                        clickFlag = True
                     """非表示にしたい場合は上2行のif文を以下のように変更することで実現できます
                     if(action_element.text == blockStr):
                         action_element.click()
@@ -86,8 +93,11 @@ def main():
                     if(action_element.text == timeoutStr):
                         action_element.click()
                     """
-
-
+                if(clickFlag == False):
+                    #クリックできなかった場合は、ESCキーを入力してポップアップを終了させる
+                    #(これがないと次のエレメントが取れない)
+                    action_element.send_keys(Keys.ESCAPE)
+                    #print(f"esc")
         time.sleep(3)
     print("自動ブロック終了")
     driver.quit()
