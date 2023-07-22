@@ -1,6 +1,5 @@
 import pytchat
 import time
-import threading
 import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -24,7 +23,7 @@ import PySimpleGUI as sg
 def is_empty_string(string):
     return not string
 
-def main(videoID, actType, strActCount):
+def main(videoID, actType, strActCount, strRepeat, strTimeInterval):
     #以下のIDは配信ごとに変更してください。
     #
     video_id = videoID
@@ -89,6 +88,7 @@ def main(videoID, actType, strActCount):
     chatNormal = '/html/body/yt-live-chat-app/div/yt-live-chat-renderer/iron-pages/div/yt-live-chat-header-renderer/div[1]/span[2]/yt-sort-filter-sub-menu-renderer/yt-dropdown-menu/tp-yt-paper-menu-button/tp-yt-iron-dropdown/div/div/tp-yt-paper-listbox/a[2]'
     driver.find_element(By.XPATH, chatNormal).click()
 
+    actUser_dict = {}
     livechat = pytchat.create(video_id)
     while livechat.is_alive():
         #ブラウザが閉じられたかどうかを検知し、ブラウザが閉じられたら終了する。
@@ -109,11 +109,37 @@ def main(videoID, actType, strActCount):
             messageStr = emoji.emojize(c.message)
             if len(messageStr)>strCount:   #コメントが150文字以上
                 #情報確認用
-                print(f"{c.id} {c.author.channelUrl} {c.datetime} {c.author.name} {messageStr} {c.amountString} {is_empty_string(c.amountString)}")
+                #print(f"{c.id} {c.author.channelUrl} {c.datetime} {c.timestamp} {c.author.name} {messageStr} {c.amountString} {is_empty_string(c.amountString)}")
 
                 #コメントの内容がスーパーチャットの時は無視する(以下の処理がなくても削除はされないが、処理に時間がかかる)
                 if(is_empty_string(c.amountString) == False):
                     continue
+
+                #検索して存在するか
+                if c.author.channelUrl not in actUser_dict:
+                    actUser_dict[c.author.channelUrl] = [int(1),c.timestamp]
+                    #print(f"キー追加：{actUser_dict[c.author.channelUrl]}")
+                else:
+                    #前回の間隔を超えていたら1カウント、間隔ないなら+カウント
+                    beforeData = actUser_dict[c.author.channelUrl]
+                    #print(f"前キー確認：{beforeData},{beforeData[0]},{beforeData[1]}")
+                    if  c.timestamp - int(beforeData[1]) < strTimeInterval*1000:
+                        cnt = beforeData[0] + 1
+                        actUser_dict[c.author.channelUrl] = [cnt,c.timestamp]
+                        print(f"{cnt}回目の更新：{c.author.name}")
+                    else:
+                        actUser_dict[c.author.channelUrl] = [int(1),c.timestamp]
+                        #print(f"キー再設定：{actUser_dict[c.author.channelUrl]}")
+
+                #回数を超えていない場合はペナルティを発生せずに続ける。
+                actCount = actUser_dict[c.author.channelUrl]
+                #print(f"キー確認：{actUser_dict[c.author.channelUrl]},{actCount},{strRepeat}")
+                if strRepeat > int(actCount[0]):
+                    continue
+                else:
+                    #ペナルティが発生したら辞書から削除する
+                    print(f"ペナルティ発生：{c.author.name} {c.author.channelUrl}に対してペナルティを実施します")
+                    actUser_dict.pop(c.author.channelUrl)
 
                 #対象のコメントに対してidを検索してエレメントを取得する
                 comment_id = '//*[@id=\"' + c.id + '\"]/div[2]/yt-icon-button/button/yt-icon/yt-icon-shape/icon-shape/div'
@@ -168,11 +194,10 @@ sg.theme("DarkBlue")
 #表示する画面の設定をします。"初期値"はGUIを起動したときにテキストボックスに表示される値です。
 layout=[[sg.Text("VideoID(URLの○○○部分[https://www.youtube.com/watch?v=○○○])を入力してください")],
         [sg.Text("VideoID"),sg.InputText("",key="text")],
-        [sg.Radio('削除',group_id='action', key='actDel', default=True),sg.Radio('タイムアウト',group_id='action', key='actTimeout'),sg.Radio('非表示',group_id='action', key='actHidden')],
-        [sg.Text("コメント文字数条件(文字)"),sg.Combo(values=['10', '20', '30', '40', '50', '60', '70', '80', '90', '100', '110','120','130','140','150','160','170','180','190'], default_value="150", size=(10, 1), key='strCount', enable_events=True)],
-        #TODO今後、連投の為の設定を追加する。同じユーザーが〇文字以上を〇回連続で〇秒以内に連投する場合にアクションを行う。
-        #[sg.Text("繰り返し条件回数            "),sg.Combo(values=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], default_value='3', size=(10, 1), key='repeat', enable_events=True)],
-        #[sg.Text("コメント間隔(sec)            "),sg.Combo(values=['0.5', '1.0', '2.0', '3.0', '4.0','5.0','8.0','10.0','15.0','20.0','25.0','30.0'], default_value='5.0', size=(10, 1), key='timeInterval', enable_events=True)],
+        [sg.Radio('削除',group_id='action', key='actDel'),sg.Radio('タイムアウト',group_id='action', key='actTimeout', default=True),sg.Radio('非表示',group_id='action', key='actHidden')],
+        [sg.Text("コメント文字数条件"),sg.Combo(values=['10', '20', '30', '40', '50', '60', '70', '80', '90', '100', '110','120','130','140','150','160','170','180','190'], default_value="150", size=(10, 1), key='strCount', enable_events=True)],
+        [sg.Text("繰り返し条件回数    "),sg.Combo(values=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], default_value='3', size=(10, 1), key='repeat', enable_events=True)],
+        [sg.Text("コメント間隔(秒)     "),sg.Combo(values=['1', '2', '3', '4','5','8','10','15','20','25','30'], default_value='5', size=(10, 1), key='timeInterval', enable_events=True)],
         [sg.Button("モデレーター開始",key="ok")]]
 
 window=sg.Window("YTAutoModerator",layout)
@@ -194,7 +219,10 @@ while True:
         if values['actHidden']==True:
             actType = 2
         strCount=int(values['strCount'])
-        main(videoID,actType,strCount)
+        strRepeat=int(values['repeat'])
+        strTimeInterval=int(values['timeInterval'])
+
+        main(videoID,actType,strCount,strRepeat,strTimeInterval)
         break
 
 #画面を閉じます。
