@@ -4,8 +4,10 @@ import json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 import emoji
 import PySimpleGUI as sg
+
 
 #使用ツール : pytchat
 #URL : https://github.com/taizan-hokuto/pytchat
@@ -74,6 +76,7 @@ def main(videoID, actType, strActCount, strRepeat, strTimeInterval):
     driver.get(str(strChatURL))
     driver.implicitly_wait(5)
 
+    actions1 = ActionChains(driver)
 
     #表示を上位チャットからチャットに切り替える
     selectChatType = '/html/body/yt-live-chat-app/div/yt-live-chat-renderer/iron-pages/div/yt-live-chat-header-renderer/div[1]/span[2]/yt-sort-filter-sub-menu-renderer/yt-dropdown-menu/tp-yt-paper-menu-button/div/tp-yt-paper-button/div'
@@ -142,7 +145,7 @@ def main(videoID, actType, strActCount, strRepeat, strTimeInterval):
                     actUser_dict.pop(c.author.channelUrl)
 
                 #対象のコメントに対してidを検索してエレメントを取得する
-                comment_id = '//*[@id=\"' + c.id + '\"]/div[2]/yt-icon-button/button/yt-icon/yt-icon-shape/icon-shape/div'
+                strID = str(c.id)
                 #TODO クリックする位置を変えてやる必要がある。(コメントを直接クリックしているが、3点リーダー部分をクリックする必要ある
                 existComment = False
                 for _ in range(5):  #ブラウザに表示される前に選択する場合があるため、待つ
@@ -152,9 +155,26 @@ def main(videoID, actType, strActCount, strRepeat, strTimeInterval):
                             scrollXPathStr="/html/body/yt-live-chat-app/div/yt-live-chat-renderer/iron-pages/div/div[1]/div[3]/div[1]/yt-live-chat-item-list-renderer/div/yt-icon-button/button/yt-icon/yt-icon-shape/icon-shape/div"
                             driver.find_element(By.XPATH, scrollXPathStr).click()
                         except:
+                            print(f"except find target1")
+                            #target1 = driver.find_element(By.XPATH, comment_id)
+                            target1 = driver.find_element(By.ID, strID)
+                            print(f"target1:{target1}")
+                            actions1.move_to_element(target1).perform()
+                            time.sleep(3)
+                            num_of_comment = target1.click()
+                            print(f"{num_of_comment}")
+                            existComment = True
                             pass
-                        num_of_comment = driver.find_element(By.XPATH, comment_id).click()
-                        existComment = True
+                        if not(existComment):
+                            print(f"ok find target1")
+                            #target1 = driver.find_element(By.XPATH, comment_id)
+                            target1 = driver.find_element(By.ID, strID)
+                            print(f"target1:{target1}")
+                            actions1.move_to_element(target1).perform()
+                            time.sleep(3)
+                            num_of_comment = target1.click()
+                            print(f"{num_of_comment}")
+                            existComment = True
                     except:
                         time.sleep(1)       #エレメントが実際に表示されるまでは待つ
                     else:
@@ -163,10 +183,13 @@ def main(videoID, actType, strActCount, strRepeat, strTimeInterval):
                 if(existComment):
                     #actionStr = '//*[@id="items"]/ytd-menu-navigation-item-renderer' #『チャンネル』へを押したい場合はこのXPathを取得してください
                     actionStr = '/html/body/yt-live-chat-app/tp-yt-iron-dropdown/div/ytd-menu-popup-renderer/tp-yt-paper-listbox/ytd-menu-service-item-renderer'
+                    print(f"メニュー選択")
                     action_elements =  driver.find_elements(By.XPATH, actionStr)
                     clickFlag = False
                     for action_element in action_elements:
-                        if(action_element.text == delStr):
+                        if(action_element.text == SlectActStr):
+                            print(f"{action_element.text}を実行します")
+                            #actions1.move_to_element(action_element).perform()
                             action_element.click()
                             #クリックした場合はフラグをTrueに設定してください。
                             clickFlag = True
@@ -194,7 +217,7 @@ sg.theme("DarkBlue")
 #表示する画面の設定をします。"初期値"はGUIを起動したときにテキストボックスに表示される値です。
 layout=[[sg.Text("VideoID(URLの○○○部分[https://www.youtube.com/watch?v=○○○])を入力してください")],
         [sg.Text("VideoID"),sg.InputText("",key="text")],
-        [sg.Radio('削除',group_id='action', key='actDel'),sg.Radio('タイムアウト',group_id='action', key='actTimeout', default=True),sg.Radio('非表示',group_id='action', key='actHidden')],
+        [sg.Radio('削除',group_id='action', key='actDel', default=True),sg.Radio('タイムアウト',group_id='action', key='actTimeout', disabled=True),sg.Radio('非表示',group_id='action', key='actHidden')],
         [sg.Text("コメント文字数条件"),sg.Combo(values=['10', '20', '30', '40', '50', '60', '70', '80', '90', '100', '110','120','130','140','150','160','170','180','190'], default_value="150", size=(10, 1), key='strCount', enable_events=True)],
         [sg.Text("繰り返し条件回数    "),sg.Combo(values=['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], default_value='3', size=(10, 1), key='repeat', enable_events=True)],
         [sg.Text("コメント間隔(秒)     "),sg.Combo(values=['1', '2', '3', '4','5','8','10','15','20','25','30'], default_value='5', size=(10, 1), key='timeInterval', enable_events=True)],
